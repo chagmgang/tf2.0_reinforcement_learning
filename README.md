@@ -13,3 +13,7 @@
 * [x] [Prioritized Experience Replay](https://arxiv.org/abs/1511.05952)
 
 ## Policy Based Reinforcement Learning
+
+* [x] [Actor Critic](https://papers.nips.cc/paper/1786-actor-critic-algorithms.pdf)
+
+* [ ] [Proximal Policy Optimization](https://arxiv.org/pdf/1707.06347.pdf)
