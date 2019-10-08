@@ -32,3 +32,4 @@
 6. [Actor Critic](https://papers.nips.cc/paper/1786-actor-critic-algorithms.pdf)
 7. [Proximal Policy Optimization](https://arxiv.org/pdf/1707.06347.pdf)
 8. [High-Dimensional Continuous Control Using Generalized Advantage Estimation](https://arxiv.org/abs/1506.02438)
+9. [tf2.0-Guide](https://github.com/kimmyungsup/Reinforcement-Learning-with-Tensorflow-2.0)
