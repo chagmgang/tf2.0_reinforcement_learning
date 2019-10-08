@@ -12,7 +12,7 @@
 
 * [x] [Prioritized Experience Replay](rainbow/per_dd_dqn.py)
 
-* [ ] [Implicit Quantile Networks for Distributional Reinforcement Learning]
+* [ ] [Implicit Quantile Networks for Distributional Reinforcement Learning]()
 
 ## Policy Based Reinforcement Learning(Click to code)
 
