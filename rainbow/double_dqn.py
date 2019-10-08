@@ -70,7 +70,7 @@ class Agent:
             dones = tf.convert_to_tensor(dones, dtype=tf.float32)
 
             target_q = self.dqn_target(tf.convert_to_tensor(np.vstack(next_states), dtype=tf.float32))
-            main_q = self.dqn_target(tf.convert_to_tensor(np.vstack(next_states), dtype=tf.float32))
+            main_q = self.dqn_model(tf.convert_to_tensor(np.vstack(next_states), dtype=tf.float32))
             main_q = tf.stop_gradient(main_q)
             next_action = tf.argmax(main_q, axis=1)
             target_value = tf.reduce_sum(tf.one_hot(next_action, self.action_size) * target_q, axis=1)
