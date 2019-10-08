@@ -12,6 +12,8 @@
 
 * [x] [Prioritized Experience Replay](rainbow/per_dd_dqn.py)
 
+* [ ] [Implicit Quantile Networks for Distributional Reinforcement Learning]
+
 ## Policy Based Reinforcement Learning(Click to code)
 
 * [x] [Actor Critic](policy/a2c.py)
@@ -33,3 +35,4 @@
 7. [Proximal Policy Optimization](https://arxiv.org/pdf/1707.06347.pdf)
 8. [High-Dimensional Continuous Control Using Generalized Advantage Estimation](https://arxiv.org/abs/1506.02438)
 9. [tf2.0-Guide](https://github.com/kimmyungsup/Reinforcement-Learning-with-Tensorflow-2.0)
+10. [Implicit Quantile Networks for Distributional Reinforcement Learning](https://arxiv.org/abs/1806.06923)
