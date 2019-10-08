@@ -10,6 +10,6 @@
 
 * [ ] [Multi Step Deep Q Learning](https://arxiv.org/abs/1901.07510)
 
-* [ ] [Prioritized Experience Replay](https://arxiv.org/abs/1511.05952)
+* [x] [Prioritized Experience Replay](https://arxiv.org/abs/1511.05952)
 
 ## Policy Based Reinforcement Learning
