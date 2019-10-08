@@ -7,55 +7,45 @@ from tensorflow.keras import Model
 import random
 import gym
 
-class ActorModel(Model):
+class A2C(Model):
     def __init__(self):
-        super(ActorModel, self).__init__()
+        super(A2C, self).__init__()
+        self.layer1 = tf.keras.layers.Dense(128, activation='relu')
+        self.layer2 = tf.keras.layers.Dense(128, activation='relu')
         self.layer_a1 = tf.keras.layers.Dense(64, activation='relu')
-        self.layer_a2 = tf.keras.layers.Dense(64, activation='relu')
-        self.layer_a3 = tf.keras.layers.Dense(64, activation='relu')
-        self.logits = tf.keras.layers.Dense(2, activation='softmax')
-
-    def call(self, state):
-        layer_a1 = self.layer_a1(state)
-        layer_a2 = self.layer_a2(layer_a1)
-        layer_a3 = self.layer_a3(layer_a2)
-        logits = self.logits(layer_a3)
-        return logits
-
-class CriticModel(Model):
-    def __init__(self):
-        super(CriticModel, self).__init__()
         self.layer_c1 = tf.keras.layers.Dense(64, activation='relu')
-        self.layer_c2 = tf.keras.layers.Dense(64, activation='relu')
-        self.layer_c3 = tf.keras.layers.Dense(64, activation='relu')
+        self.logits = tf.keras.layers.Dense(2, activation='softmax')
         self.value = tf.keras.layers.Dense(1)
 
     def call(self, state):
-        layer_c1 = self.layer_c1(state)
-        layer_c2 = self.layer_c2(layer_c1)
-        layer_c3 = self.layer_c3(layer_c2)
-        value = self.value(layer_c3)
-        return value
+        layer1 = self.layer1(state)
+        layer2 = self.layer2(layer1)
+        
+        layer_a1 = self.layer_a1(layer2)
+        logits = self.logits(layer_a1)
+
+        layer_c1 = self.layer_c1(layer2)
+        value = self.value(layer_c1)
+
+        return logits, value
 
 class Agent:
     def __init__(self):
-        self.lr = 0.01
+        self.lr = 0.001
         self.gamma = 0.99
 
-        self.policy = ActorModel()
-        self.value = CriticModel()
-        self.policy_opt = optimizers.Adam(lr=self.lr, )
-        self.value_opt = optimizers.Adam(lr=self.lr, )
+        self.a2c = A2C()
+        self.opt = optimizers.Adam(lr=self.lr, )
         
-        self.rollout = 128
-        self.batch_size = 128
+        self.rollout = 32
+        self.batch_size = 32
         self.state_size = 4
         self.action_size = 2
 
     def get_action(self, state):
 
         state = tf.convert_to_tensor([state], dtype=tf.float32)
-        policy = self.policy(state)
+        policy, _ = self.a2c(state)
         policy = np.array(policy)[0]
         action = np.random.choice(self.action_size, p=policy)
         return action
@@ -71,35 +61,31 @@ class Agent:
         done = [done[i] for i in sample_idx]
         action = [action[i] for i in sample_idx]
 
-        critic_variable = self.value.trainable_variables
-        with tf.GradientTape() as tape_critic:
-            tape_critic.watch(critic_variable)
-            current_value = self.value(tf.convert_to_tensor(state, dtype=tf.float32))
-            next_value = self.value(tf.convert_to_tensor(next_state, dtype=tf.float32))
+        a2c_variable = self.a2c.trainable_variables
+        with tf.GradientTape() as tape:
+            tape.watch(a2c_variable)
+            _, current_value = self.a2c(tf.convert_to_tensor(state, dtype=tf.float32))
+            _, next_value = self.a2c(tf.convert_to_tensor(next_state, dtype=tf.float32))
             current_value, next_value = tf.squeeze(current_value), tf.squeeze(next_value)
             target = tf.stop_gradient(self.gamma * (1-tf.convert_to_tensor(done, dtype=tf.float32)) * next_value + tf.convert_to_tensor(reward, dtype=tf.float32))
             value_loss = tf.reduce_mean(tf.square(target - current_value) * 0.5)
 
-        value_grads = tape_critic.gradient(value_loss, critic_variable)
-        self.value_opt.apply_gradients(zip(value_grads, critic_variable))
-
-        actor_variable = self.policy.trainable_variables
-        with tf.GradientTape() as tape_actor:
-            tape_actor.watch(actor_variable)
-            policy = self.policy(tf.convert_to_tensor(state, dtype=tf.float32))
+            policy, _  = self.a2c(tf.convert_to_tensor(state, dtype=tf.float32))
+            entropy = tf.reduce_mean(- policy * tf.math.log(policy+1e-8)) * 0.1
             action = tf.convert_to_tensor(action, dtype=tf.int32)
             onehot_action = tf.one_hot(action, self.action_size)
             action_policy = tf.reduce_sum(onehot_action * policy, axis=1)
             adv = tf.stop_gradient(target - current_value)
-            pi_loss = -tf.reduce_mean(tf.math.log(action_policy) * adv) - tf.reduce_mean(- policy * tf.math.log(policy)) * 0.01
+            pi_loss = -tf.reduce_mean(tf.math.log(action_policy+1e-8) * adv) - entropy
 
-        actor_grads = tape_actor.gradient(pi_loss, actor_variable)
-        self.policy_opt.apply_gradients(zip(actor_grads, actor_variable))
+            total_loss = pi_loss + value_loss
 
+        grads = tape.gradient(total_loss, a2c_variable)
+        self.opt.apply_gradients(zip(grads, a2c_variable))
 
     def run(self):
 
-        env = gym.make('CartPole-v1')
+        env = gym.make('CartPole-v0')
         state = env.reset()
         episode = 0
         score = 0
@@ -117,7 +103,7 @@ class Agent:
                 score += reward
 
                 if done:
-                    if score == 500:
+                    if score == 200:
                         reward = 1
                     else:
                         reward = -1
