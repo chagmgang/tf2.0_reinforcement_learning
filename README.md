@@ -22,7 +22,7 @@
 
 ## Advantage(Click to code)
 
-* [High-Dimensional Continuous Control Using Generalized Advantage Estimation](policy/ppo.py)
+* [x] [High-Dimensional Continuous Control Using Generalized Advantage Estimation](policy/ppo.py)
 
 ## Reference
 
