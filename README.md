@@ -16,14 +16,19 @@
 
 * [x] [Actor Critic](policy/a2c.py)
 
-* [ ] [Proximal Policy Optimization]()
+* [x] [Proximal Policy Optimization](policy/ppo.py)
+
+## Advantage(Click to code)
+
+* [High-Dimensional Continuous Control Using Generalized Advantage Estimation](policy/ppo.py)
 
 ## Reference
 
-1.  [Deep Q Learning](https://storage.googleapis.com/deepmind-media/dqn/DQNNaturePaper.pdf)
-2.  [Double Deep Q Learning](https://arxiv.org/abs/1509.06461)
-3.  [Dueling Deep Q Learning](https://arxiv.org/abs/1511.06581)
-4.  [Multi Step Deep Q Learning](https://arxiv.org/abs/1901.07510)
-5.  [Prioritized Experience Replay](https://arxiv.org/abs/1511.05952)
-6.  [Actor Critic](https://papers.nips.cc/paper/1786-actor-critic-algorithms.pdf)
-7.  [Proximal Policy Optimization](https://arxiv.org/pdf/1707.06347.pdf)
+1. [Deep Q Learning](https://storage.googleapis.com/deepmind-media/dqn/DQNNaturePaper.pdf)
+2. [Double Deep Q Learning](https://arxiv.org/abs/1509.06461)
+3. [Dueling Deep Q Learning](https://arxiv.org/abs/1511.06581)
+4. [Multi Step Deep Q Learning](https://arxiv.org/abs/1901.07510)
+5. [Prioritized Experience Replay](https://arxiv.org/abs/1511.05952)
+6. [Actor Critic](https://papers.nips.cc/paper/1786-actor-critic-algorithms.pdf)
+7. [Proximal Policy Optimization](https://arxiv.org/pdf/1707.06347.pdf)
+8. [High-Dimensional Continuous Control Using Generalized Advantage Estimation](https://arxiv.org/abs/1506.02438)

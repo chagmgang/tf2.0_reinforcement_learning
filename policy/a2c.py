@@ -37,8 +37,8 @@ class Agent:
         self.a2c = A2C()
         self.opt = optimizers.Adam(lr=self.lr, )
         
-        self.rollout = 32
-        self.batch_size = 32
+        self.rollout = 128
+        self.batch_size = 128
         self.state_size = 4
         self.action_size = 2
 
@@ -85,7 +85,7 @@ class Agent:
 
     def run(self):
 
-        env = gym.make('CartPole-v0')
+        env = gym.make('CartPole-v1')
         state = env.reset()
         episode = 0
         score = 0
@@ -103,7 +103,7 @@ class Agent:
                 score += reward
 
                 if done:
-                    if score == 200:
+                    if score == 500:
                         reward = 1
                     else:
                         reward = -1
