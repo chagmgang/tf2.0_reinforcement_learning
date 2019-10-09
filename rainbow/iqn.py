@@ -156,7 +156,7 @@ class IQN(Model):
 
 class Agent:
     def __init__(self):
-        self.lr = 0.001
+        self.lr = 0.00025
         self.gamma = 0.99
 
         self.get_action_num_quantile = 32
@@ -168,14 +168,13 @@ class Agent:
         self.train_tau_max = 1.0
 
         self.train_num_quantile = 8
-
-        self.iqn_model = IQN()
-        self.iqn_target = IQN()
-        self.opt = optimizers.Adam(lr=self.lr, )
-
         self.batch_size = 64
         self.state_size = 4
         self.action_size = 2
+
+        self.iqn_model = IQN()
+        self.iqn_target = IQN()
+        self.opt = optimizers.Adam(lr=self.lr, epsilon=(1e-2 / self.batch_size))
 
         self.memory = collections.deque(maxlen=int(2000))
 
