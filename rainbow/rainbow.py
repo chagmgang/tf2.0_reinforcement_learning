@@ -105,6 +105,35 @@ class Memory(object):  # stored as ( s, a, r, s_ ) in SumTree
         p = self._getPriority(error)
         self.tree.update(idx, p)
 
+class n_step_memory:
+    def __init__(self, maxlen):
+        self.maxlen = maxlen
+        self.state = collections.deque(maxlen=int(maxlen))
+        self.action = collections.deque(maxlen=int(maxlen))
+        self.reward = collections.deque(maxlen=int(maxlen))
+        self.next_state = collections.deque(maxlen=int(maxlen))
+        self.done = collections.deque(maxlen=int(maxlen))
+
+    def append(self, state, next_state, reward, done, action):
+        self.state.append(state)
+        self.action.append(action)
+        self.reward.append(reward)
+        self.next_state.append(next_state)
+        self.done.append(done)
+
+    def sample(self):
+        if len(self.state) == int(self.maxlen):
+            done = [self.done[i] for i in range(self.maxlen-1)]
+            if True in done:
+                return None
+            return {'state': np.stack(self.state),
+                    'next_state': np.stack(self.next_state),
+                    'reward': np.stack(self.reward),
+                    'done': np.stack(self.done),
+                    'action': np.stack(self.action)}
+        else:
+            return None
+
 class Embedding(Model):
     def __init__(self, embedding_dim):
         super(Embedding, self).__init__()
@@ -184,40 +213,52 @@ class Agent:
         self.batch_size = 64
         self.state_size = 4
         self.action_size = 2
+        self.n_step = 5
 
+        self.n_step_memory = n_step_memory(maxlen=int(self.n_step))
         self.memory = Memory(capacity=int(2000))
 
     def append_sample(self, state, action, reward, next_state, done):
+        self.n_step_memory.append(state, next_state, reward, done, action)
+        n_step_sample = self.n_step_memory.sample()
+        if not n_step_sample is None:
+            state = n_step_sample['state'][0]
+            next_state = n_step_sample['next_state'][-1]
+            reward = n_step_sample['reward']
+            done = n_step_sample['done'][-1]
+            action = n_step_sample['action'][0]
 
-        _, Q_batch, _ = self.iqn_model(
+            reward = np.sum([np.power(self.gamma, i) * r for i, r in enumerate(reward)])
+
+            _, Q_batch, _ = self.iqn_model(
             tf.convert_to_tensor([next_state], dtype=tf.float32),
-            self.train_num_quantile, self.train_tau_min,
-            self.train_tau_max)
-        
-        Q_batch = np.array(Q_batch)[0]
-        next_action = np.argmax(Q_batch)
+            self.get_action_num_quantile, self.get_action_tau_min,
+            self.get_action_tau_max)
 
-        _, target_Q_batch, _ = self.iqn_target(
+            Q_batch = np.array(Q_batch)[0]
+            next_action = np.argmax(Q_batch)
+
+            _, target_Q_batch, _ = self.iqn_target(
             tf.convert_to_tensor([next_state], dtype=tf.float32),
-            self.train_num_quantile, self.train_tau_min,
-            self.train_tau_max)
-        
-        target_Q_batch = np.array(target_Q_batch)[0]
-        target_value = target_Q_batch[next_action]
+            self.get_action_num_quantile, self.get_action_tau_min,
+            self.get_action_tau_max)
 
-        target_value = target_value * self.gamma * (1-done) + reward
-        
-        _, Q_batch, _ = self.iqn_model(
-            tf.convert_to_tensor([state], dtype=tf.float32),
-            self.train_num_quantile, self.train_tau_min,
-            self.train_tau_max)
-        
-        main_q = np.array(Q_batch)[0]
-        main_q = main_q[action]
+            target_Q_batch = np.array(target_Q_batch)[0]
+            target_value = target_Q_batch[next_action]
 
-        td_error = np.abs(target_value - main_q)
+            target_value = target_value * self.gamma * (1-done) + reward
+        
+            _, Q_batch, _ = self.iqn_model(
+                tf.convert_to_tensor([state], dtype=tf.float32),
+                self.get_action_num_quantile, self.get_action_tau_min,
+                self.get_action_tau_max)
+        
+            main_q = np.array(Q_batch)[0]
+            main_q = main_q[action]
 
-        self.memory.add(td_error, (state, action, reward, next_state, done))
+            td_error = np.abs(target_value - main_q)
+
+            self.memory.add(td_error, (state, action, reward, next_state, done))
 
     def get_action(self, state, epsilon):
         state = tf.convert_to_tensor([state], dtype=tf.float32)
@@ -340,7 +381,7 @@ class Agent:
 
                 state = next_state
 
-                if step > 1000:
+                if step > 100:
                     self.update()
                     if step % 20 == 0:
                         self.update_target()

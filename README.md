@@ -10,9 +10,11 @@
 
 * [x] [Prioritized Experience Replay](rainbow/per_dd_dqn.py)
 
+* [x] [Multi Step Learning](rainbow/multi_per_dd_dqn.py)
+
 * [x] [Implicit Quantile Networks for Distributional Reinforcement Learning](rainbow/iqn.py)
 
-* [x] [IQN, Double, Dueling, PER](rainbow/rainbow.py)
+* [x] [DQN, IQN, Double, Dueling, PER, MultiStep](rainbow/rainbow.py)
 
 ## Policy Based Reinforcement Learning(Click to code)
 
@@ -35,3 +37,4 @@
 7. [High-Dimensional Continuous Control Using Generalized Advantage Estimation](https://arxiv.org/abs/1506.02438)
 8. [tf2.0-Guide](https://github.com/kimmyungsup/Reinforcement-Learning-with-Tensorflow-2.0)
 9. [Implicit Quantile Networks for Distributional Reinforcement Learning](https://arxiv.org/abs/1806.06923)
+10. [Multi Step Learning](https://arxiv.org/abs/1901.07510)
