@@ -134,7 +134,9 @@ class IQN(Model):
         self.layer2 = tf.keras.layers.Dense(64, activation='relu')
 
         self.h_fc1 = tf.keras.layers.Dense(64, activation='relu')
-        self.value = tf.keras.layers.Dense(self.num_action)
+        self.state = tf.keras.layers.Dense(self.num_action)
+        self.advantage = tf.keras.layers.Dense(self.num_action)
+
 
     def call(self, state, num_quantile, tau_min, tau_max):
         layer1 = self.layer1(state)
@@ -147,15 +149,18 @@ class IQN(Model):
         h_flat_embedding = tf.multiply(h_flat_tile, embedding_out)
         
         h_fc1 = self.h_fc1(h_flat_embedding)
-        logits = self.value(h_fc1)
+        logits_state = self.state(h_fc1)
+        logits_hidden = self.advantage(h_fc1)
+        mean = tf.expand_dims(tf.reduce_mean(logits_hidden, axis=1), axis=1)
+        advantage = (logits_hidden - mean)
+
+        logits = logits_state + advantage
+
         logits_reshape = tf.reshape(logits, [num_quantile, state.shape[0], self.num_action])
         
         Q_action = tf.reduce_mean(logits_reshape, axis=0)
 
         return logits_reshape, Q_action, sample
-
-        
-        
 
 class Agent:
     def __init__(self):
@@ -180,10 +185,39 @@ class Agent:
         self.state_size = 4
         self.action_size = 2
 
-        self.memory = collections.deque(maxlen=int(2000))
+        self.memory = Memory(capacity=int(2000))
 
     def append_sample(self, state, action, reward, next_state, done):
-        self.memory.append([state, action, reward, next_state, done])
+
+        _, Q_batch, _ = self.iqn_model(
+            tf.convert_to_tensor([next_state], dtype=tf.float32),
+            self.train_num_quantile, self.train_tau_min,
+            self.train_tau_max)
+        
+        Q_batch = np.array(Q_batch)[0]
+        next_action = np.argmax(Q_batch)
+
+        _, target_Q_batch, _ = self.iqn_target(
+            tf.convert_to_tensor([next_state], dtype=tf.float32),
+            self.train_num_quantile, self.train_tau_min,
+            self.train_tau_max)
+        
+        target_Q_batch = np.array(target_Q_batch)[0]
+        target_value = target_Q_batch[next_action]
+
+        target_value = target_value * self.gamma * (1-done) + reward
+        
+        _, Q_batch, _ = self.iqn_model(
+            tf.convert_to_tensor([state], dtype=tf.float32),
+            self.train_num_quantile, self.train_tau_min,
+            self.train_tau_max)
+        
+        main_q = np.array(Q_batch)[0]
+        main_q = main_q[action]
+
+        td_error = np.abs(target_value - main_q)
+
+        self.memory.add(td_error, (state, action, reward, next_state, done))
 
     def get_action(self, state, epsilon):
         state = tf.convert_to_tensor([state], dtype=tf.float32)
@@ -202,7 +236,7 @@ class Agent:
         self.iqn_target.set_weights(self.iqn_model.get_weights())
 
     def update(self):
-        mini_batch = random.sample(self.memory, self.batch_size)
+        mini_batch, idxs, IS_weight = self.memory.sample(self.batch_size)
 
         states = np.stack([i[0] for i in mini_batch])
         actions = np.stack([i[1] for i in mini_batch])
@@ -214,17 +248,27 @@ class Agent:
             tf.convert_to_tensor(np.stack(next_states), dtype=tf.float32),
             self.train_num_quantile, self.train_tau_min,
             self.train_tau_max)
-        theta_batch, _, _ = self.iqn_target(
+        theta_batch, next_target_Q, _ = self.iqn_target(
             tf.convert_to_tensor(np.stack(next_states), dtype=tf.float32),
             self.train_num_quantile, self.train_tau_min,
             self.train_tau_max)
+
         Q_batch, theta_batch = np.array(Q_batch), np.array(theta_batch)
+        next_target_Q = np.array(next_target_Q)
+        next_action = np.argmax(next_target_Q, axis=1)
+        next_value = np.stack([t[a] for a, t in zip(next_action, next_target_Q)])
+
+        target_value_list = []
+        for r, d, nv in zip(rewards, dones, next_value):
+            target_value_list.append(r + self.gamma * (1-d) * nv)
+        target_value_list = np.stack(target_value_list)
 
         theta_target = []
         for i in range(len(mini_batch)):
             theta_target.append([])
             for j in range(self.train_num_quantile):
                 target_value = rewards[i] + self.gamma * (1-dones[i]) * theta_batch[j, i, np.argmax(Q_batch[i])]
+                theta_target[i].append(target_value)
 
         action_binary = np.zeros([self.train_num_quantile, len(mini_batch), self.action_size])
         for i in range(len(actions)):
@@ -252,13 +296,27 @@ class Agent:
             inv_tau = 1.0 - tau
 
             Loss = tf.where(tf.less(error_loss, 0.0), inv_tau * Huber_loss, tau * Huber_loss)
-            Loss = tf.reduce_mean(tf.reduce_sum(tf.reduce_mean(Loss, axis=-1), axis=0))
+            unweighted_loss = tf.reduce_sum(tf.reduce_mean(Loss, axis=-1), axis=0)
+            weight = tf.convert_to_tensor(IS_weight, dtype=tf.float32)
+            Loss = tf.reduce_mean(unweighted_loss * weight)
 
         grads = tape.gradient(Loss, iqn_variable)
         self.opt.apply_gradients(zip(grads, iqn_variable))
+
+        _, main_q, _ = self.iqn_model(
+            tf.convert_to_tensor(states, dtype=tf.float32),
+            self.train_num_quantile, self.train_tau_min,
+            self.train_tau_max)
+
+        main_q = np.array(main_q)
+        main_q = np.stack([q[a] for a, q in zip(actions, Q_batch)])
+
+        td_error = np.abs(target_value_list - main_q)
         
-
-
+        for i in range(len(mini_batch)):
+            idx = idxs[i]
+            self.memory.update(idx, td_error[i])
+        
     def run(self):
 
         env = gym.make('CartPole-v1')
