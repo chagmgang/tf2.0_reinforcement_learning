@@ -196,6 +196,7 @@ class Agent:
             main_value = tf.reduce_sum(tf.one_hot(action, self.action_size) * main_q, axis=1)
 
             error = tf.square(main_value - target_value) * 0.5
+            error = error * tf.convert_to_tensor(IS_weight, dtype=tf.float32)
             error = tf.reduce_mean(error)
 
         dqn_grads = tape.gradient(error, dqn_variable)

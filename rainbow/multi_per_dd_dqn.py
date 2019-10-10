@@ -203,7 +203,7 @@ class Agent:
 
             reward = np.sum([np.power(self.gamma, i) * r for i, r in enumerate(reward)])
 
-            td_error = np.abs(reward + self.gamma * target_next_q * (1-done) - main_current_q)
+            td_error = np.abs(reward + np.power(self.gamma, self.n_step) * target_next_q * (1-done) - main_current_q)
 
             self.memory.add(td_error, (state, action, reward, next_state, done))    
 
@@ -230,12 +230,13 @@ class Agent:
             next_action = tf.argmax(main_q, axis=1)
             target_value = tf.reduce_sum(tf.one_hot(next_action, self.action_size) * target_q, axis=1)
 
-            target_value = (1-done) * self.gamma * target_value + reward
+            target_value = (1-done) * np.power(self.gamma, self.n_step) * target_value + reward
 
             main_q = self.dqn_model(tf.convert_to_tensor(np.vstack(state), dtype=tf.float32))
             main_value = tf.reduce_sum(tf.one_hot(action, self.action_size) * main_q, axis=1)
 
             error = tf.square(main_value - target_value) * 0.5
+            error = error * tf.convert_to_tensor(IS_weight, dtype=tf.float32)
             error = tf.reduce_mean(error)
 
         dqn_grads = tape.gradient(error, dqn_variable)

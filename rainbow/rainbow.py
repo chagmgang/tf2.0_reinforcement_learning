@@ -245,7 +245,7 @@ class Agent:
             target_Q_batch = np.array(target_Q_batch)[0]
             target_value = target_Q_batch[next_action]
 
-            target_value = target_value * self.gamma * (1-done) + reward
+            target_value = target_value * np.power(self.gamma, self.n_step) * (1-done) + reward
         
             _, Q_batch, _ = self.iqn_model(
                 tf.convert_to_tensor([state], dtype=tf.float32),
@@ -300,14 +300,14 @@ class Agent:
 
         target_value_list = []
         for r, d, nv in zip(rewards, dones, next_value):
-            target_value_list.append(r + self.gamma * (1-d) * nv)
+            target_value_list.append(r + np.power(self.gamma, self.n_step) * (1-d) * nv)
         target_value_list = np.stack(target_value_list)
 
         theta_target = []
         for i in range(len(mini_batch)):
             theta_target.append([])
             for j in range(self.train_num_quantile):
-                target_value = rewards[i] + self.gamma * (1-dones[i]) * theta_batch[j, i, np.argmax(Q_batch[i])]
+                target_value = rewards[i] + np.power(self.gamma, self.n_step) * (1-dones[i]) * theta_batch[j, i, np.argmax(Q_batch[i])]
                 theta_target[i].append(target_value)
 
         action_binary = np.zeros([self.train_num_quantile, len(mini_batch), self.action_size])
