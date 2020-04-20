@@ -68,47 +68,58 @@ class Agent:
         return action
 
     def update(self, state, next_state, reward, done, action):
+
+        old_policy, current_value = self.ppo(tf.convert_to_tensor(state, dtype=tf.float32))
+        _, next_value = self.ppo(tf.convert_to_tensor(next_state, dtype=tf.float32))
+        current_value, next_value = tf.squeeze(current_value), tf.squeeze(next_value)
+        current_value, next_value = np.array(current_value), np.array(next_value)
+        old_policy = np.array(old_policy)
+        
+        adv, target = get_gaes(
+            rewards=np.array(reward),
+            dones=np.array(done),
+            values=current_value,
+            next_values=next_value,
+            gamma=self.gamma,
+            lamda=self.lamda,
+            normalize=self.normalize)
+
         for _ in range(self.epoch):
             sample_range = np.arange(self.rollout)
             np.random.shuffle(sample_range)
             sample_idx = sample_range[:self.batch_size]
+            
+            batch_state = [state[i] for i in sample_idx]
+            batch_done = [done[i] for i in sample_idx]
+            batch_action = [action[i] for i in sample_idx]
+            batch_target = [target[i] for i in sample_idx]
+            batch_adv = [adv[i] for i in sample_idx]
+            batch_old_policy = [old_policy[i] for i in sample_idx]
 
-            state = [state[i] for i in sample_idx]
-            next_state = [next_state[i] for i in sample_idx]
-            reward = [reward[i] for i in sample_idx]
-            done = [done[i] for i in sample_idx]
-            action = [action[i] for i in sample_idx]
-
-            old_policy, _ = self.ppo(tf.convert_to_tensor(state, dtype=tf.float32))
-            old_policy = tf.stop_gradient(old_policy)
             ppo_variable = self.ppo.trainable_variables
 
             with tf.GradientTape() as tape:
                 tape.watch(ppo_variable)
-                _, current_value = self.ppo(tf.convert_to_tensor(state, dtype=tf.float32))
-                _, next_value = self.ppo(tf.convert_to_tensor(next_state, dtype=tf.float32))
-                current_value, next_value = tf.squeeze(current_value), tf.squeeze(next_value)
-                
-                adv, target = get_gaes(
-                    np.array(reward), np.array(done), 
-                    np.array(current_value), np.array(next_value), self.gamma, self.lamda, self.normalize)
-                target = tf.convert_to_tensor(target, dtype=tf.float32)
-                value_loss = tf.reduce_mean(tf.square(target - current_value) * 0.5)
+                train_policy, train_current_value = self.ppo(tf.convert_to_tensor(batch_state, dtype=tf.float32))
+                train_current_value = tf.squeeze(train_current_value)
+                train_adv = tf.convert_to_tensor(batch_adv, dtype=tf.float32)
+                train_target = tf.convert_to_tensor(batch_target, dtype=tf.float32)
+                train_action = tf.convert_to_tensor(batch_action, dtype=tf.int32)
+                train_old_policy = tf.convert_to_tensor(batch_old_policy, dtype=tf.float32)
 
-                adv = tf.convert_to_tensor(adv, dtype=tf.float32)
-                policy, _ = self.ppo(tf.convert_to_tensor(state, dtype=tf.float32))
-                entropy = tf.reduce_mean(- policy * tf.math.log(policy+1e-8)) * 0.1
-                action = tf.convert_to_tensor(action, dtype=tf.int32)
-                onehot_action = tf.one_hot(action, self.action_size)
-                selected_prob = tf.reduce_sum(onehot_action * policy, axis=1)
-                selected_old_prob = tf.reduce_sum(onehot_action * old_policy, axis=1)
+                entropy = tf.reduce_mean(-train_policy * tf.math.log(train_policy + 1e-8)) * 0.1
+                onehot_action = tf.one_hot(train_action, self.action_size)
+                selected_prob = tf.reduce_sum(train_policy * onehot_action, axis=1)
+                selected_old_prob = tf.reduce_sum(train_old_policy * onehot_action, axis=1)
                 logpi = tf.math.log(selected_prob + 1e-8)
                 logoldpi = tf.math.log(selected_old_prob + 1e-8)
 
                 ratio = tf.exp(logpi - logoldpi)
                 clipped_ratio = tf.clip_by_value(ratio, clip_value_min=1-self.ppo_eps, clip_value_max=1+self.ppo_eps)
-                minimum = tf.minimum(tf.multiply(adv, clipped_ratio), tf.multiply(adv, ratio))
+                minimum = tf.minimum(tf.multiply(train_adv, clipped_ratio), tf.multiply(train_adv, ratio))
                 pi_loss = -tf.reduce_mean(minimum) + entropy
+
+                value_loss = tf.reduce_mean(tf.square(train_target - train_current_value))
 
                 total_loss = pi_loss + value_loss
 
